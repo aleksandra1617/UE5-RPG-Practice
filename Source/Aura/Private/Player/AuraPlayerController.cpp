@@ -5,10 +5,18 @@
 
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "Interaction/EnemyInterface.h"
 
 AAuraPlayerController::AAuraPlayerController()
 {
 	bReplicates = true;
+}
+
+void AAuraPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+
+	CursorTrace();
 }
 
 void AAuraPlayerController::BeginPlay()
@@ -51,5 +59,55 @@ void AAuraPlayerController::Move(const FInputActionValue& InputActionValue)
 	{
 		ControlledPawn->AddMovementInput(ForwardDirection, InputAxisVector.Y);
 		ControlledPawn->AddMovementInput(RightDirection, InputAxisVector.X);
+	}
+}
+
+void AAuraPlayerController::CursorTrace()
+{
+	FHitResult CursorHit;
+	// In order for this to work set the collision preset of targets to Block Visibility.
+	GetHitResultUnderCursor(ECC_Visibility, false, CursorHit);
+
+	if (!CursorHit.bBlockingHit) return;
+
+	LastActor = ThisActor;
+	ThisActor = CursorHit.GetActor();
+
+	/**
+	 * Line Trace from cursor. There are several scenarios:
+	 *	A. LastActor is null && ThisActor is null (Do nothing, hovering on things that are not enemies)
+	 *	B. LastActor is null && ThisActor is valid (First hover over this actor)
+	 *		- Highlight ThisActor
+	 *	C. LastActor is valid && ThisActor is null
+	 *		- Unhighlight LastActor
+	 *	D. LastActor is valid && ThisActor is valid, but LastActor != ThisActor
+	 *		- Unhighlight LastActor, and Highlight ThisActor
+	 *	E. Both Actors are valid, and are the same actor LastActor == ThisActor
+	 *		- Do nothing, hovering over an enemy that is already highlighted
+	 */
+
+	if (LastActor == nullptr)
+	{
+		// Case B
+		if (ThisActor != nullptr)
+		{
+			ThisActor->HighlightActor();
+		}
+	}
+	else
+	{
+		// Case D
+		if (ThisActor != nullptr)
+		{
+			if (LastActor != ThisActor)
+			{
+				LastActor->UnHighlightActor();
+				ThisActor->HighlightActor();
+			}
+		}
+		else // Case C
+		{
+			LastActor->UnHighlightActor();
+		}
 	}
 }
